@@ -20,13 +20,23 @@ int_time_entry = tk.StringVar()
 int_time_entry.set("2")
 int_time = 2  # default integration time = 2us
 
-trigger_mode = tk.StringVar()
-trigger_mode.set("0")
+trigger_mode_entry = tk.StringVar()
+trigger_mode_entry.set('0')
+trigger_mode = 0
 
 collect_control = True  # enable collection controls
 sample_control = True  # enable sampling controls
 test_mode = False  # activate test mode
 spec = None
+
+max_intensity_var = tk.StringVar()
+max_intensity_var.set('N/A')
+integration_limits_var = tk.StringVar()
+integration_limits_var.set('N/A')
+pixel_var = tk.StringVar()
+pixel_var.set('N/A')
+sample_var = tk.StringVar()
+sample_var.set('N/A')
 
 devices = seabreeze.spectrometers.list_devices()
 
@@ -47,7 +57,7 @@ spectra_plot.set_xlabel('Wavelength [nm]')
 spectra_plot.set_title('Observed Emission Spectra')
 
 
-def update_plot():
+def update_plot():  # take a fresh sample from source
     if not devices:
         t_data = generate_dummy_spectra(central_spectra=(random.randint(300, 500), random.randint(500, 700),
                                                          random.randint(700, 900)))
@@ -60,12 +70,22 @@ def update_plot():
             spectra_plot.plot(t_data[0], t_data[1])
             canvas.draw()
     else:
+        spec.trigger_mode(trigger_mode)  # set trigger mode
+        spec.integration_time_micros(int_time)  # set integration_time
+
+        # update plot
         spectra_plot.clear()
         spectra_plot.set_ylabel('Intensity')
         spectra_plot.set_xlabel('Wavelength [nm]')
         spectra_plot.set_title('Observed Emission Spectra')
         spectra_plot.plot(spec.wavelengths(), spec.intensities())
         canvas.draw()
+
+        # update settings bar
+        pixel_var.set(len(spec.pixels))
+        integration_limits_var.set(spec.integration_time_micros_limits)
+        max_intensity_var.set(spec.max_intensity)
+        sample_var.set(len(spec.wavelengths()))
 
 
 def reconnect_device():
@@ -99,15 +119,31 @@ reconnect.grid(row=0, column=2, columnspan=2, sticky="NSEW")
 tk.Label(text="Sampling Controls", relief=tk.GROOVE).grid(row=1, columnspan=2, column=2, sticky="NSEW")
 
 refresh = tk.Button(root, text="Refresh Data", command=update_plot)
-refresh.grid(row=2, column=2, columnspan=2, sticky="NSEW")
+refresh.grid(row=4, column=2, columnspan=2, sticky="NSEW")
 
-tk.Label(root, text="Integration Time [μs]", relief=tk.GROOVE).grid(row=3, column=2, sticky="NSEW")
+tk.Label(root, text="Integration Time [μs]", relief=tk.GROOVE).grid(row=2, column=2, sticky="NSEW")
 int_entry = tk.Entry(textvariable=int_time_entry, relief=tk.FLAT, bg="white")
-int_entry.grid(row=3, column=3, sticky="NSEW")
+int_entry.grid(row=2, column=3, sticky="NSEW")
 
-tk.Label(root, text="Trigger Mode", relief=tk.GROOVE).grid(row=4, column=2, sticky="NSEW")
-trigger_mode_entry = tk.Entry(root, textvariable=trigger_mode, relief=tk.FLAT, bg="white")
-trigger_mode_entry.grid(row=4, column=3, sticky="NSEW")
+tk.Label(root, text="Trigger Mode", relief=tk.GROOVE).grid(row=3, column=2, sticky="NSEW")
+trigger_entry = tk.Entry(root, textvariable=trigger_mode_entry, relief=tk.FLAT, bg="white")
+trigger_entry.grid(row=3, column=3, sticky="NSEW")
+
+tk.Label(root, text="Current Settings", relief=tk.GROOVE).grid(row=5, column=2, columnspan=2, sticky="NSEW")
+tk.Label(root, text="Max Intensity", relief=tk.GROOVE).grid(row=6, column=2, sticky="NSEW")
+tk.Label(root, textvariable=max_intensity_var, bg='gray', relief=tk.FLAT).grid(row=6, column=3, sticky="NSEW")
+tk.Label(root, text="Integration Bounds", relief=tk.GROOVE).grid(row=7, column=2, sticky="NSEW")
+tk.Label(root, textvariable=integration_limits_var, bg='gray', relief=tk.FLAT).grid(row=7, column=3, sticky="NSEW")
+tk.Label(root, text="Pixel Count", relief=tk.GROOVE).grid(row=8, column=2, sticky="NSEW")
+tk.Label(root, textvariable=pixel_var, bg='gray', relief=tk.FLAT).grid(row=8, column=3, sticky="NSEW")
+tk.Label(root, text="Sample Count", relief=tk.GROOVE).grid(row=9, column=2, sticky="NSEW")
+tk.Label(root, textvariable=sample_var, bg='gray', relief=tk.FLAT).grid(row=9, column=3, sticky="NSEW")
+
+img_button = tk.Button(root, text='Export Image')
+img_button.grid(row=10, column=2, columnspan=2, sticky="NSEW")
+
+csv_button = tk.Button(root, text='Export CSV')
+csv_button.grid(row=11, column=2, columnspan=2, sticky="NSEW")
 
 
 def update_integration_time(a, b, c):
@@ -122,10 +158,27 @@ def update_integration_time(a, b, c):
                 int_entry.config(bg="white")
             else:
                 int_entry.config(bg="red")
-        except Exception:
+        except ValueError:
             int_entry.config(bg="red")
 
 
+def update_trigger_mode(a, b, c):
+    global trigger_mode
+    if not trigger_mode_entry:
+        trigger_entry.config(bg='red')
+    else:
+        try:
+            t = int(trigger_mode_entry.get())
+            if t in range(0, 4):
+                trigger_mode = t
+                trigger_entry.config(bg='white')
+            else:
+                trigger_entry.config(bg='red')
+        except ValueError:
+            trigger_entry.config(bg='red')
+
+
+trigger_mode_entry.trace_variable('w', update_trigger_mode)
 int_time_entry.trace_variable('w', update_integration_time)
 
 root.mainloop()

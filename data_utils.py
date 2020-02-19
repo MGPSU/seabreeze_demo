@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import random
+from tkinter import filedialog
+import pickle
 matplotlib.use("TkAgg")
 
 
@@ -27,3 +29,22 @@ def get_plot(device=None, test=False):
 
 def export_plot():
     pass
+
+
+def export_csv():
+    pass
+
+
+def pickle_data(device):
+    fp = filedialog.asksaveasfilename(initialdir="./",
+                                      title="Select file",
+                                      filetypes=(("pickled data", "*.p"), ("all files", "*.*")))
+    f = open(fp, 'wb')
+    pickle.dump(device, f)
+
+
+def unpickle_data():
+    name = filedialog.askopenfilename(initialdir="./",
+                                      title="Select file",
+                                      filetypes=(("pickled data", "*.p"), ("all files", "*.*")))
+    pickle.load(open(name, 'rb'))
