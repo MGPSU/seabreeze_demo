@@ -7,7 +7,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import random
 from tkinter import filedialog
 import pickle
-matplotlib.use("TkAgg")
+import csv
 
 
 def get_plot(device=None, test=False):
@@ -27,12 +27,18 @@ def get_plot(device=None, test=False):
         return fig
 
 
-def export_plot():
-    pass
-
-
-def export_csv():
-    pass
+def export_csv(wavelength, intensity):
+    try:
+        name = filedialog.asksaveasfilename(initialdir="./",
+                                            title="Select file",
+                                            filetypes=(("pickled data", "*.p"), ("all files", "*.*")))
+        with open(name, 'w', newline='') as f:
+            data_writer = csv.writer(f, delimiter=',', quotechar="|", quoting=csv.QUOTE_MINIMAL)
+            data_writer.writerow(['Wavelength [nm]', 'Intensity'])
+            for i in range(len(wavelength)):
+                data_writer.writerow([wavelength[i], intensity[i]])
+    except ValueError:
+        pass
 
 
 def pickle_data(device):
@@ -47,4 +53,5 @@ def unpickle_data():
     name = filedialog.askopenfilename(initialdir="./",
                                       title="Select file",
                                       filetypes=(("pickled data", "*.p"), ("all files", "*.*")))
+    print('a' + name)
     pickle.load(open(name, 'rb'))
