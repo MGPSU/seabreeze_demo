@@ -46,15 +46,15 @@ sample_var.set('N/A')
 
 devices = seabreeze.spectrometers.list_devices()
 
-while not devices:
-    collect_control = False
-    sample_control = False
-    con = messagebox.askretrycancel('ERROR: No Device Detected', 'ERROR: could not connect to spectrometer')
-    if con:
-        devices = seabreeze.spectrometers.list_devices()
-    else:
-        test_mode = messagebox.askyesno("Use Test Data", "Use Random Test Data?\nSensor can be acquired at any point")
-        break
+# while not devices:
+#     collect_control = False
+#     sample_control = False
+#     con = messagebox.askretrycancel('ERROR: No Device Detected', 'ERROR: could not connect to spectrometer')
+#     if con:
+#         devices = seabreeze.spectrometers.list_devices()
+#     else:
+#         test_mode = messagebox.askyesno("Use Test Data", "Use Random Test Data?\nSensor can be acquired at any point")
+#         break
 
 fig = plt.Figure(figsize=(5, 5), dpi=100)
 spectra_plot = fig.add_subplot(111)
@@ -160,6 +160,7 @@ tk.Label(root, textvariable=device_name, bg="White", relief=tk.GROOVE).grid(row=
 
 reconnect = tk.Button(root, text="Reconnect Device", command=reconnect_device)
 reconnect.grid(row=0, column=2, columnspan=2, sticky="NSEW")
+reconnect.config(state=tk.DISABLED)
 
 tk.Label(text="Sampling Controls", relief=tk.GROOVE).grid(row=1, columnspan=2, column=2, sticky="NSEW")
 
