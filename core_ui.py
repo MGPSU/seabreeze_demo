@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import filedialog
+from tkinter import ttk
 import seabreeze
 from seabreeze.spectrometers import Spectrometer
 import matplotlib.pyplot as plt
@@ -8,7 +9,8 @@ import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from testing_utils import generate_dummy_spectra
 import random
-import data_utils
+import pandas as pd
+import numpy as np
 import csv
 
 root = tk.Tk()
@@ -43,49 +45,41 @@ pixel_var = tk.StringVar()
 pixel_var.set('N/A')
 sample_var = tk.StringVar()
 sample_var.set('N/A')
-
+dark_count_var = tk.IntVar()
+dark_count_var.set(0)
+sync_fire_var = tk.IntVar()
+sync_fire_var.set(0)
 devices = seabreeze.spectrometers.list_devices()
-
-# while not devices:
-#     collect_control = False
-#     sample_control = False
-#     con = messagebox.askretrycancel('ERROR: No Device Detected', 'ERROR: could not connect to spectrometer')
-#     if con:
-#         devices = seabreeze.spectrometers.list_devices()
-#     else:
-#         test_mode = messagebox.askyesno("Use Test Data", "Use Random Test Data?\nSensor can be acquired at any point")
-#         break
 
 fig = plt.Figure(figsize=(5, 5), dpi=100)
 spectra_plot = fig.add_subplot(111)
 spectra_plot.set_ylabel('Intensity')
 spectra_plot.set_xlabel('Wavelength [nm]')
-# spectra_plot.set_xlim([350, 1000])  # set bounds to relevant data
 spectra_plot.set_title('Observed Emission Spectra')
+
+emission_data = pd.DataFrame(data=None, columns=['Wavelength [nm]', 'Intensity'])
 
 
 def update_plot():  # take a fresh sample from source
     global spec_range
     global spec_intensity
+    global emission_data
+    spec_data = None
     if not devices:
-        t_data = generate_dummy_spectra(central_spectra=(random.randint(300, 500), random.randint(500, 700),
-                                                         random.randint(700, 900)))
-        ref = messagebox.askyesno('Error', "Error: No device detected. Use Testing Data?")
+        ref = messagebox.askyesno('ERROR', "Error: No device detected. \nUse Testing Data?")
         if ref:  # refresh with sample data
+            emission_data = generate_dummy_spectra(central_spectra=(random.randint(300, 500), random.randint(500, 700),
+                                                   random.randint(700, 900)))
             spectra_plot.clear()
             spectra_plot.set_ylabel('Intensity')
             spectra_plot.set_xlabel('Wavelength [nm]')
-            # spectra_plot.set_xlim([350, 1000])  # set bounds to relevant data
             spectra_plot.set_title('Observed Emission Spectra')
-            spectra_plot.plot(t_data[0], t_data[1])
+            spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
             canvas.draw()
     else:
-        spec_range = spec.wavelengths()
-        spec_intensity = spec.intensities()
-        for i in range(len(spec_range)):  # filter out data from under 200 nm
-            if spec_range[i] <= 300:
-                spec_range[i] = None
-                spec_intensity[i] = None
+        emission_data = pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities(dark_count_var.get())]),
+                                     columns=['Wavelength [nm]', 'Intensity'])
+        emission_data = emission_data[emission_data > 300]
         spec_range = list(filter(None, spec_range))
         spec_intensity = list(filter(None, spec_intensity))
         spec.trigger_mode(trigger_mode)  # set trigger mode
@@ -95,11 +89,8 @@ def update_plot():  # take a fresh sample from source
         spectra_plot.clear()
         spectra_plot.set_ylabel('Intensity')
         spectra_plot.set_xlabel('Wavelength [nm]')
-        # spectra_plot.set_xlim([350, 1000])  # set bounds to relevant data
         spectra_plot.set_title('Observed Emission Spectra')
-        spectra_plot.plot(spec_range, spec_intensity)
-        # print('Min:', spec.wavelengths().min(axis=0, initial=None))
-        # print('Max:', spec.wavelengths().max(axis=0, initial=None))
+        spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
 
         canvas.draw()
 
@@ -122,35 +113,34 @@ def reconnect_device():
 def export_plot():
     name = filedialog.asksaveasfilename(initialdir="./",
                                         title="Select file",
-                                        filetypes=(("PNG", "*.png"), ("all files", "*.*")))
-    if name:
+                                        filetypes=(("PNG", "*.png"), ("all files", "*.*")),
+                                        defaultextension='.p')
+    if name and name != '.p':
         fig.savefig(name)
 
 
 def export_csv():
+    global emission_data
     try:
         name = filedialog.asksaveasfilename(initialdir="./",
                                             title="Select file",
-                                            filetypes=(("CSV data", "*.csv"), ("all files", "*.*")))
-        with open(name, 'w', newline='') as f:
-            data_writer = csv.writer(f, delimiter=',', quotechar="|", quoting=csv.QUOTE_MINIMAL)
-            data_writer.writerow(['Wavelength [nm]', 'Intensity'])
-            for i in range(len(spec_range)):
-                data_writer.writerow([spec_range[i], spec_intensity[i]])
+                                            filetypes=(("CSV data", "*.csv"), ("all files", "*.*")),
+                                            defaultextension='.csv')
+        if name:
+            emission_data.to_csv(name, index=None, header=True)
+        else:
+            pass
     except ValueError:
         pass
 
 
-if test_mode:
-    tst_data = generate_dummy_spectra(central_spectra=(random.randint(300, 500), random.randint(500, 700),
-                                                       random.randint(700, 900)))
-    spectra_plot.plot(tst_data[0], tst_data[1])
-
-elif not devices:
+if not devices:
     spectra_plot.plot(0, 0)
 else:
     spec = seabreeze.spectrometers.Spectrometer.from_first_available()
-    spectra_plot.plot(spec.wavelengths(), spec.intensities())
+    emission_data = pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities(dark_count_var.get())]),
+                                 columns=['Wavelength [nm]', 'Intensity'])
+    spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
     device_name.set(spec.serial_number)
 canvas = FigureCanvasTkAgg(fig, master=root)
 canvas.get_tk_widget().grid(row=1, column=0, columnspan=2, rowspan=20)  # plot initial data
@@ -164,9 +154,6 @@ reconnect.config(state=tk.DISABLED)
 
 tk.Label(text="Sampling Controls", relief=tk.GROOVE).grid(row=1, columnspan=2, column=2, sticky="NSEW")
 
-refresh = tk.Button(root, text="Refresh Data", command=update_plot)
-refresh.grid(row=4, column=2, columnspan=2, sticky="NSEW")
-
 tk.Label(root, text="Integration Time [μs]", relief=tk.GROOVE).grid(row=2, column=2, sticky="NSEW")
 int_entry = tk.Entry(textvariable=int_time_entry, relief=tk.FLAT, bg="white")
 int_entry.grid(row=2, column=3, sticky="NSEW")
@@ -175,21 +162,62 @@ tk.Label(root, text="Trigger Mode", relief=tk.GROOVE).grid(row=3, column=2, stic
 trigger_entry = tk.Entry(root, textvariable=trigger_mode_entry, relief=tk.FLAT, bg="white")
 trigger_entry.grid(row=3, column=3, sticky="NSEW")
 
-tk.Label(root, text="Current Settings", relief=tk.GROOVE).grid(row=5, column=2, columnspan=2, sticky="NSEW")
-tk.Label(root, text="Max Intensity", relief=tk.GROOVE).grid(row=6, column=2, sticky="NSEW")
-tk.Label(root, textvariable=max_intensity_var, bg='gray', relief=tk.FLAT).grid(row=6, column=3, sticky="NSEW")
-tk.Label(root, text="Integration Bounds", relief=tk.GROOVE).grid(row=7, column=2, sticky="NSEW")
-tk.Label(root, textvariable=integration_limits_var, bg='gray', relief=tk.FLAT).grid(row=7, column=3, sticky="NSEW")
-tk.Label(root, text="Pixel Count", relief=tk.GROOVE).grid(row=8, column=2, sticky="NSEW")
-tk.Label(root, textvariable=pixel_var, bg='gray', relief=tk.FLAT).grid(row=8, column=3, sticky="NSEW")
-tk.Label(root, text="Sample Count", relief=tk.GROOVE).grid(row=9, column=2, sticky="NSEW")
-tk.Label(root, textvariable=sample_var, bg='gray', relief=tk.FLAT).grid(row=9, column=3, sticky="NSEW")
+tk.Checkbutton(root, text="Dark Spectra Subtraction", variable=dark_count_var, relief=tk.FLAT)\
+    .grid(row=4, column=2, sticky="NSEW")
+
+tk.Checkbutton(root, text="Synchronize Laser", variable=sync_fire_var, relief=tk.FLAT)\
+    .grid(row=4, column=3, sticky="NSEW")
+
+
+refresh = tk.Button(root, text="Acquire Sample", command=update_plot)
+refresh.grid(row=5, column=2, columnspan=2, sticky="NSEW")
+
+tk.Label(root, text="Current Settings", relief=tk.GROOVE).grid(row=6, column=2, columnspan=2, sticky="NSEW")
+tk.Label(root, text="Max Intensity", relief=tk.GROOVE).grid(row=7, column=2, sticky="NSEW")
+tk.Label(root, textvariable=max_intensity_var, bg='gray', relief=tk.FLAT).grid(row=7, column=3, sticky="NSEW")
+tk.Label(root, text="Integration Bounds", relief=tk.GROOVE).grid(row=8, column=2, sticky="NSEW")
+tk.Label(root, textvariable=integration_limits_var, bg='gray', relief=tk.FLAT).grid(row=8, column=3, sticky="NSEW")
+tk.Label(root, text="Pixel Count", relief=tk.GROOVE).grid(row=9, column=2, sticky="NSEW")
+tk.Label(root, textvariable=pixel_var, bg='gray', relief=tk.FLAT).grid(row=9, column=3, sticky="NSEW")
+tk.Label(root, text="Sample Count", relief=tk.GROOVE).grid(row=10, column=2, sticky="NSEW")
+tk.Label(root, textvariable=sample_var, bg='gray', relief=tk.FLAT).grid(row=10, column=3, sticky="NSEW")
 
 img_button = tk.Button(root, text='Export Image', command=export_plot)
-img_button.grid(row=10, column=2, columnspan=2, sticky="NSEW")
+img_button.grid(row=11, column=2, columnspan=2, sticky="NSEW")
 
 csv_button = tk.Button(root, text='Export CSV', command=export_csv)
-csv_button.grid(row=11, column=2, columnspan=2, sticky="NSEW")
+csv_button.grid(row=12, column=2, columnspan=2, sticky="NSEW")
+
+# laser control UI
+# tk.Button(root, text=" ", state=tk.DISABLED).grid(row=0, column=4, rowspan=21, sticky="NSEW")  # divider
+# tk.Label(root, text="Laser Controls", relief=tk.FLAT).grid(row=0, column=5, columnspan=2, sticky="NSEW")
+#
+# tk.Label(text="Sampling Controls", relief=tk.GROOVE).grid(row=1, columnspan=2, column=5, sticky="NSEW")
+#
+# tk.Label(text="Pulse Mode", relief=tk.GROOVE).grid(row=2, column=5, sticky="NSEW")
+# tk.Entry(relief=tk.FLAT, bg="white").grid(row=2, column=6, sticky="NSEW")
+#
+# tk.Label(text="Rep Rate", relief=tk.GROOVE).grid(row=3, column=5, sticky="NSEW")
+# tk.Entry(relief=tk.FLAT, bg="white").grid(row=3, column=6, sticky="NSEW")
+#
+# tk.Label(text="Burst Count", relief=tk.GROOVE).grid(row=4, column=5, sticky="NSEW")
+# tk.Entry(relief=tk.FLAT, bg="white").grid(row=4, column=6, sticky="NSEW")
+#
+# tk.Label(text="Diode Settings", relief=tk.GROOVE).grid(row=5, column=5, columnspan=2, sticky="NSEW")
+#
+# tk.Label(text="Diode Current", relief=tk.GROOVE).grid(row=6, column=5, sticky="NSEW")
+# tk.Entry(relief=tk.FLAT, bg="white").grid(row=6, column=6, sticky="NSEW")
+#
+# tk.Label(text="Energy Mode", relief=tk.GROOVE).grid(row=7, column=5, sticky="NSEW")
+# tk.Entry(relief=tk.FLAT, bg="white").grid(row=7, column=6, sticky="NSEW")
+#
+# tk.Label(text="Diode Pulse Width", relief=tk.GROOVE).grid(row=8, column=5, sticky="NSEW")
+# tk.Entry(relief=tk.FLAT, bg="white").grid(row=8, column=6, sticky="NSEW")
+#
+# tk.Label(text="Diode Trigger", relief=tk.GROOVE).grid(row=9, column=5, sticky="NSEW")
+# tk.Entry(relief=tk.FLAT, bg="white").grid(row=9, column=6, sticky="NSEW")
+#
+# tk.Label(text="Diode Settings", relief=tk.GROOVE).grid(row=5, column=5, columnspan=2, sticky="NSEW")
 
 
 def update_integration_time(a, b, c):
@@ -226,6 +254,5 @@ def update_trigger_mode(a, b, c):
 
 trigger_mode_entry.trace_variable('w', update_trigger_mode)
 int_time_entry.trace_variable('w', update_integration_time)
-update_plot()
 
 root.mainloop()

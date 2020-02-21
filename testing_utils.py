@@ -1,5 +1,5 @@
 import numpy as np
-import seabreeze as sb
+import pandas as pd
 import random
 
 random.seed(1337)
@@ -37,4 +37,6 @@ def generate_dummy_spectra(central_spectra=(500, 730, 380), width=100, bins=1E4,
                     except ZeroDivisionError:
                         val = 1000 / (float(j - i + 0.02) ** 2)
         intensities.append(val)
-    return wavelengths, intensities
+    spec_data = np.asarray([wavelengths, intensities]).transpose()
+    output_frame = pd.DataFrame(data=spec_data, columns=['Wavelength [nm]', 'Intensity'])
+    return output_frame
