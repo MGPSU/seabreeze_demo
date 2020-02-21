@@ -77,11 +77,10 @@ def update_plot():  # take a fresh sample from source
             spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
             canvas.draw()
     else:
-        emission_data = pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities(dark_count_var.get())]),
-                                     columns=['Wavelength [nm]', 'Intensity'])
+        emission_data = \
+            pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities(dark_count_var.get())]).transpose(),
+                         columns=['Wavelength [nm]', 'Intensity'])
         emission_data = emission_data[emission_data > 300]
-        spec_range = list(filter(None, spec_range))
-        spec_intensity = list(filter(None, spec_intensity))
         spec.trigger_mode(trigger_mode)  # set trigger mode
         spec.integration_time_micros(int_time)  # set integration_time
 
@@ -97,8 +96,6 @@ def update_plot():  # take a fresh sample from source
         # update settings bar
         pixel_var.set(spec.pixels)
         integration_limits_var.set(spec.integration_time_micros_limits)
-        max_intensity_var.set(max(spec_intensity))
-        sample_var.set(len(spec_range))
 
 
 def reconnect_device():
@@ -138,8 +135,9 @@ if not devices:
     spectra_plot.plot(0, 0)
 else:
     spec = seabreeze.spectrometers.Spectrometer.from_first_available()
-    emission_data = pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities(dark_count_var.get())]),
-                                 columns=['Wavelength [nm]', 'Intensity'])
+    emission_data = \
+        pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities(dark_count_var.get())]).transpose(),
+                     columns=['Wavelength [nm]', 'Intensity'])
     spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
     device_name.set(spec.serial_number)
 canvas = FigureCanvasTkAgg(fig, master=root)
@@ -310,5 +308,6 @@ def update_trigger_mode(a, b, c):
 
 trigger_mode_entry.trace_variable('w', update_trigger_mode)
 int_time_entry.trace_variable('w', update_integration_time)
+update_plot()
 
 root.mainloop()
