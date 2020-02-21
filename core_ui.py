@@ -64,7 +64,9 @@ def update_plot():  # take a fresh sample from source
     global spec_range
     global spec_intensity
     global emission_data
-    spec_data = None
+    dark_spec = pd.DataFrame(data=None, columns=['Wavelength [nm]', 'Intensity'])
+    spec.trigger_mode(trigger_mode)  # set trigger mode
+    spec.integration_time_micros(int_time)  # set integration_time
     if not devices:
         ref = messagebox.askyesno('ERROR', "Error: No device detected. \nUse Testing Data?")
         if ref:  # refresh with sample data
@@ -76,19 +78,27 @@ def update_plot():  # take a fresh sample from source
             spectra_plot.set_title('Observed Emission Spectra')
             spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
             canvas.draw()
-    else:
-        emission_data = \
-            pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities(dark_count_var.get())]).transpose(),
-                         columns=['Wavelength [nm]', 'Intensity'])
+    else:  # todo, sync laser and second sample
+        if dark_count_var.get():
+            dark_count_data = \
+                pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities()]).transpose(),
+                             columns=['Wavelength [nm]', 'Intensity'])
+            emission_data = \
+                pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities()]).transpose(),
+                             columns=['Wavelength [nm]', 'Intensity'])
+            emission_data -= dark_count_data
+        else:
+            emission_data = \
+                pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities()]).transpose(),
+                             columns=['Wavelength [nm]', 'Intensity'])
+        # filter data from under 300nm
         emission_data = emission_data[emission_data > 300]
-        spec.trigger_mode(trigger_mode)  # set trigger mode
-        spec.integration_time_micros(int_time)  # set integration_time
-
         # update plot
         spectra_plot.clear()
         spectra_plot.set_ylabel('Intensity')
         spectra_plot.set_xlabel('Wavelength [nm]')
         spectra_plot.set_title('Observed Emission Spectra')
+        print(emission_data.dropna(axis=0))
         spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
 
         canvas.draw()
@@ -137,7 +147,7 @@ if not devices:
 else:
     spec = seabreeze.spectrometers.Spectrometer.from_first_available()
     emission_data = \
-        pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities(dark_count_var.get())]).transpose(),
+        pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities()]).transpose(),
                      columns=['Wavelength [nm]', 'Intensity'])
     spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
     device_name.set(spec.serial_number)
@@ -186,37 +196,6 @@ img_button.grid(row=11, column=2, columnspan=2, sticky="NSEW")
 
 csv_button = tk.Button(root, text='Export CSV', command=export_csv)
 csv_button.grid(row=12, column=2, columnspan=2, sticky="NSEW")
-
-# laser control UI
-# tk.Button(root, text=" ", state=tk.DISABLED).grid(row=0, column=4, rowspan=21, sticky="NSEW")  # divider
-# tk.Label(root, text="Laser Controls", relief=tk.FLAT).grid(row=0, column=5, columnspan=2, sticky="NSEW")
-#
-# tk.Label(text="Sampling Controls", relief=tk.GROOVE).grid(row=1, columnspan=2, column=5, sticky="NSEW")
-#
-# tk.Label(text="Pulse Mode", relief=tk.GROOVE).grid(row=2, column=5, sticky="NSEW")
-# tk.Entry(relief=tk.FLAT, bg="white").grid(row=2, column=6, sticky="NSEW")
-#
-# tk.Label(text="Rep Rate", relief=tk.GROOVE).grid(row=3, column=5, sticky="NSEW")
-# tk.Entry(relief=tk.FLAT, bg="white").grid(row=3, column=6, sticky="NSEW")
-#
-# tk.Label(text="Burst Count", relief=tk.GROOVE).grid(row=4, column=5, sticky="NSEW")
-# tk.Entry(relief=tk.FLAT, bg="white").grid(row=4, column=6, sticky="NSEW")
-#
-# tk.Label(text="Diode Settings", relief=tk.GROOVE).grid(row=5, column=5, columnspan=2, sticky="NSEW")
-#
-# tk.Label(text="Diode Current", relief=tk.GROOVE).grid(row=6, column=5, sticky="NSEW")
-# tk.Entry(relief=tk.FLAT, bg="white").grid(row=6, column=6, sticky="NSEW")
-#
-# tk.Label(text="Energy Mode", relief=tk.GROOVE).grid(row=7, column=5, sticky="NSEW")
-# tk.Entry(relief=tk.FLAT, bg="white").grid(row=7, column=6, sticky="NSEW")
-#
-# tk.Label(text="Diode Pulse Width", relief=tk.GROOVE).grid(row=8, column=5, sticky="NSEW")
-# tk.Entry(relief=tk.FLAT, bg="white").grid(row=8, column=6, sticky="NSEW")
-#
-# tk.Label(text="Diode Trigger", relief=tk.GROOVE).grid(row=9, column=5, sticky="NSEW")
-# tk.Entry(relief=tk.FLAT, bg="white").grid(row=9, column=6, sticky="NSEW")
-#
-# tk.Label(text="Diode Settings", relief=tk.GROOVE).grid(row=5, column=5, columnspan=2, sticky="NSEW")
 
 
 def update_integration_time(a, b, c):
