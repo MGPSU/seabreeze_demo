@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import filedialog
-from tkinter import ttk
 import seabreeze
 from seabreeze.spectrometers import Spectrometer
 import matplotlib.pyplot as plt
@@ -11,7 +10,7 @@ from testing_utils import generate_dummy_spectra
 import random
 import pandas as pd
 import numpy as np
-import csv
+import laser_control
 
 root = tk.Tk()
 root.resizable(0, 0)
@@ -51,6 +50,15 @@ sync_fire_var = tk.IntVar()
 sync_fire_var.set(0)
 devices = seabreeze.spectrometers.list_devices()
 
+pulse_options = {'Continuous', 'Single Shot', 'Burst'}
+pulse_mode = tk.StringVar()
+pulse_mode.set('Continuous')
+
+rep_rate_control = tk.StringVar()
+rep_rate_control.set('10')
+
+rep_rate_control
+
 fig = plt.Figure(figsize=(5, 5), dpi=100)
 spectra_plot = fig.add_subplot(111)
 spectra_plot.set_ylabel('Intensity')
@@ -65,8 +73,6 @@ def update_plot():  # take a fresh sample from source
     global spec_intensity
     global emission_data
     dark_spec = pd.DataFrame(data=None, columns=['Wavelength [nm]', 'Intensity'])
-    spec.trigger_mode(trigger_mode)  # set trigger mode
-    spec.integration_time_micros(int_time)  # set integration_time
     if not devices:
         ref = messagebox.askyesno('ERROR', "Error: No device detected. \nUse Testing Data?")
         if ref:  # refresh with sample data
@@ -79,6 +85,8 @@ def update_plot():  # take a fresh sample from source
             spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
             canvas.draw()
     else:  # todo, sync laser and second sample
+        spec.trigger_mode(trigger_mode)  # set trigger mode
+        spec.integration_time_micros(int_time)  # set integration_time
         if dark_count_var.get():
             dark_count_data = \
                 pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities()]).transpose(),
@@ -98,7 +106,6 @@ def update_plot():  # take a fresh sample from source
         spectra_plot.set_ylabel('Intensity')
         spectra_plot.set_xlabel('Wavelength [nm]')
         spectra_plot.set_title('Observed Emission Spectra')
-        # print(emission_data.dropna(axis=0))
         spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
 
         canvas.draw()
@@ -196,6 +203,120 @@ img_button.grid(row=11, column=2, columnspan=2, sticky="NSEW")
 
 csv_button = tk.Button(root, text='Export CSV', command=export_csv)
 csv_button.grid(row=12, column=2, columnspan=2, sticky="NSEW")
+
+
+# laser control UI
+tk.Button(root, text=" ", state=tk.DISABLED).grid(row=0, column=4, rowspan=21, sticky="NSEW")  # divider
+tk.Label(root, text="Laser Controls", relief=tk.FLAT).grid(row=0, column=5, columnspan=2, sticky="NSEW")
+
+tk.Label(text="Pulse Control", relief=tk.GROOVE).grid(row=1, columnspan=2, column=5, sticky="NSEW")
+
+tk.Label(text="Pulse Mode", relief=tk.GROOVE).grid(row=2, column=5, sticky="NSEW")
+tk.OptionMenu(root, pulse_mode, *pulse_options).grid(row=2, column=6, sticky="NSEW")
+
+tk.Label(text="Rep Rate", relief=tk.GROOVE).grid(row=3, column=5, sticky="NSEW")
+tk.Entry(relief=tk.FLAT, bg="white").grid(row=3, column=6, sticky="NSEW")
+
+tk.Label(text="Burst Count", relief=tk.GROOVE).grid(row=4, column=5, sticky="NSEW")
+tk.Entry(relief=tk.FLAT, bg="white").grid(row=4, column=6, sticky="NSEW")
+
+tk.Label(text="Diode Settings", relief=tk.GROOVE).grid(row=5, column=5, columnspan=2, sticky="NSEW")
+
+tk.Label(text="Diode Current", relief=tk.GROOVE).grid(row=6, column=5, sticky="NSEW")
+tk.Entry(relief=tk.FLAT, bg="white").grid(row=6, column=6, sticky="NSEW")
+
+tk.Label(text="Energy Mode", relief=tk.GROOVE).grid(row=7, column=5, sticky="NSEW")
+tk.Entry(relief=tk.FLAT, bg="white").grid(row=7, column=6, sticky="NSEW")
+
+tk.Label(text="Diode Pulse Width", relief=tk.GROOVE).grid(row=8, column=5, sticky="NSEW")
+tk.Entry(relief=tk.FLAT, bg="white").grid(row=8, column=6, sticky="NSEW")
+
+tk.Label(text="Diode Trigger", relief=tk.GROOVE).grid(row=9, column=5, sticky="NSEW")
+tk.Entry(relief=tk.FLAT, bg="white").grid(row=9, column=6, sticky="NSEW")
+
+tk.Label(text="Laser Controls", relief=tk.GROOVE).grid(row=10, column=5, columnspan=2, sticky="NSEW")
+
+tk.Label(text="Arm Laser", relief=tk.GROOVE).grid(row=11, column=5, sticky="NSEW")
+arm = tk.Button(text='Arm')
+arm.grid(row=11, column=6, sticky="NSEW")
+
+tk.Label(text="Laser Status", relief=tk.GROOVE).grid(row=12, column=5, sticky="NSEW")
+laser_status = tk.Label(text='', relief=tk.FLAT, bg='gray')
+laser_status.grid(row=12, column=6, sticky="NSEW")
+
+auto_arm = tk.IntVar()
+auto_arm.set(0)
+tk.Checkbutton(root, text="Auto Arm", variable=auto_arm, relief=tk.FLAT)\
+    .grid(row=13, column=5, sticky="NSEW")
+
+auto_update = tk.IntVar()
+auto_update.set(0)
+tk.Checkbutton(root, text="Auto Update Data", variable=auto_update, relief=tk.FLAT)\
+    .grid(row=13, column=6, sticky="NSEW")
+
+safety_control = tk.IntVar()
+safety_control.set(0)
+tk.Checkbutton(root, text="Disable Safety", variable=safety_control, relief=tk.FLAT)\
+    .grid(row=14, column=5, sticky="NSEW")
+
+fire_control = tk.Button(text='Fire', bg='red')
+fire_control.grid(row=13, column=7, columnspan=2, rowspan=8, sticky="NSEW")
+
+tk.Label(root, text="Laser Status", relief=tk.FLAT).grid(row=0, column=7, columnspan=2, sticky="NSEW")
+
+tk.Label(root, text="Thermals", relief=tk.GROOVE).grid(row=1, column=7, columnspan=2, sticky="NSEW")
+
+diode_temp_var = tk.StringVar()
+diode_temp_var.set('N/A')
+tk.Label(root, text="Diode [°C]", relief=tk.GROOVE).grid(row=2, column=7, sticky="NSEW")
+tk.Label(root, textvariable=diode_temp_var, bg="Gray", relief=tk.FLAT).grid(row=2, column=8, sticky="NSEW")
+
+fet_temp_var = tk.StringVar()
+fet_temp_var.set('N/A')
+tk.Label(root, text="FET [°C]", relief=tk.GROOVE).grid(row=3, column=7, sticky="NSEW")
+tk.Label(root, textvariable=fet_temp_var, bg="Gray", relief=tk.FLAT).grid(row=3, column=8, sticky="NSEW")
+
+heater_target_var = tk.StringVar()
+heater_target_var.set('N/A')
+tk.Label(root, text="Heater Target [°C]", relief=tk.GROOVE).grid(row=4, column=7, sticky="NSEW")
+tk.Label(root, textvariable=heater_target_var, bg="Gray", relief=tk.FLAT).grid(row=4, column=8, sticky="NSEW")
+
+heater_temp_var = tk.StringVar()
+heater_temp_var.set('N/A')
+tk.Label(root, text="Heater Temp", relief=tk.GROOVE).grid(row=5, column=7, sticky="NSEW")
+tk.Label(root, textvariable=heater_temp_var, bg="Gray", relief=tk.FLAT).grid(row=5, column=8, sticky="NSEW")
+
+tk.Label(root, text="Voltage", relief=tk.GROOVE).grid(row=6, column=7, columnspan=2, sticky="NSEW")
+
+bank_voltage_var = tk.StringVar()
+bank_voltage_var.set('N/A')
+tk.Label(root, text="Bank Voltage", relief=tk.GROOVE).grid(row=7, column=7, sticky="NSEW")
+tk.Label(root, textvariable=bank_voltage_var, bg="Gray", relief=tk.FLAT).grid(row=7, column=8, sticky="NSEW")
+
+bank_target_var = tk.StringVar()
+bank_target_var.set('N/A')
+tk.Label(root, text="Target Bank Voltage", relief=tk.GROOVE).grid(row=8, column=7, sticky="NSEW")
+tk.Label(root, textvariable=bank_target_var, bg="Gray", relief=tk.FLAT).grid(row=8, column=8, sticky="NSEW")
+
+fet_voltage_var = tk.StringVar()
+fet_voltage_var.set('N/A')
+tk.Label(root, text="FET Voltage", relief=tk.GROOVE).grid(row=9, column=7, sticky="NSEW")
+tk.Label(root, textvariable=fet_voltage_var, bg="Gray", relief=tk.FLAT).grid(row=9, column=8, sticky="NSEW")
+
+fet_drop_var = tk.StringVar()
+fet_drop_var.set('N/A')
+tk.Label(root, text="FET Drop", relief=tk.GROOVE).grid(row=10, column=7, sticky="NSEW")
+tk.Label(root, textvariable=fet_drop_var, bg="Gray", relief=tk.FLAT).grid(row=10, column=8, sticky="NSEW")
+
+fet_drain_var = tk.StringVar()
+fet_drain_var.set('N/A')
+tk.Label(root, text="FET Drain", relief=tk.GROOVE).grid(row=11, column=7, sticky="NSEW")
+tk.Label(root, textvariable=fet_drain_var, bg="Gray", relief=tk.FLAT).grid(row=11, column=8, sticky="NSEW")
+
+fet_src_var = tk.StringVar()
+fet_src_var.set('N/A')
+tk.Label(root, text="FET Source", relief=tk.GROOVE).grid(row=12, column=7, sticky="NSEW")
+tk.Label(root, textvariable=fet_src_var, bg="Gray", relief=tk.FLAT, width=10).grid(row=12, column=8, sticky="NSEW")
 
 
 def update_integration_time(a, b, c):
