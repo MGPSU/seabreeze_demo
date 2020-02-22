@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import filedialog
-from tkinter import ttk
 import seabreeze
 from seabreeze.spectrometers import Spectrometer
 import matplotlib.pyplot as plt
@@ -11,7 +10,6 @@ from testing_utils import generate_dummy_spectra
 import random
 import pandas as pd
 import numpy as np
-import csv
 
 root = tk.Tk()
 root.resizable(0, 0)
@@ -61,13 +59,12 @@ emission_data = pd.DataFrame(data=None, columns=['Wavelength [nm]', 'Intensity']
 
 
 def update_plot():  # take a fresh sample from source
+    global spec
     global spec_range
     global spec_intensity
     global emission_data
     dark_spec = pd.DataFrame(data=None, columns=['Wavelength [nm]', 'Intensity'])
-    spec.trigger_mode(trigger_mode)  # set trigger mode
-    spec.integration_time_micros(int_time)  # set integration_time
-    if not devices:
+    if not spec:
         ref = messagebox.askyesno('ERROR', "Error: No device detected. \nUse Testing Data?")
         if ref:  # refresh with sample data
             emission_data = generate_dummy_spectra(central_spectra=(random.randint(300, 500), random.randint(500, 700),
@@ -79,6 +76,16 @@ def update_plot():  # take a fresh sample from source
             spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
             canvas.draw()
     else:  # todo, sync laser and second sample
+        try:
+            spec.trigger_mode(trigger_mode)  # set trigger mode
+        except Exception:
+            tk.messagebox.showerror('Error', 'Failed to update trigger mode')
+            return
+        try:
+            spec.integration_time_micros(int_time)  # set integration_time
+        except Exception:
+            tk.messagebox.showerror('Error', 'Failed to update integration time')
+            return
         if dark_count_var.get():
             dark_count_data = \
                 pd.DataFrame(data=np.asarray([spec.wavelengths(), spec.intensities()]).transpose(),
@@ -93,12 +100,12 @@ def update_plot():  # take a fresh sample from source
                              columns=['Wavelength [nm]', 'Intensity'])
         # filter data from under 300nm
         emission_data = emission_data[emission_data > 300]
+        emission_data = emission_data.dropna(axis=0)
         # update plot
         spectra_plot.clear()
         spectra_plot.set_ylabel('Intensity')
         spectra_plot.set_xlabel('Wavelength [nm]')
         spectra_plot.set_title('Observed Emission Spectra')
-        print(emission_data.dropna(axis=0))
         spectra_plot.plot(emission_data.iloc[0:, 0], emission_data.iloc[0:, 1])
 
         canvas.draw()
@@ -111,11 +118,13 @@ def update_plot():  # take a fresh sample from source
 
 def reconnect_device():
     global spec
+    spec = None
     if seabreeze.spectrometers.list_devices():
         spec = seabreeze.spectrometers.Spectrometer.from_first_available()
         device_name.set(spec.serial_number)
     else:
         messagebox.showerror("ERROR", "ERROR: No Device Detected")
+        device_name.set('')
 
 
 def export_plot():
@@ -128,7 +137,6 @@ def export_plot():
 
 
 def export_csv():
-    global emission_data
     try:
         name = filedialog.asksaveasfilename(initialdir="./",
                                             title="Select file",
@@ -159,7 +167,7 @@ tk.Label(root, textvariable=device_name, bg="White", relief=tk.GROOVE).grid(row=
 
 reconnect = tk.Button(root, text="Reconnect Device", command=reconnect_device)
 reconnect.grid(row=0, column=2, columnspan=2, sticky="NSEW")
-reconnect.config(state=tk.DISABLED)
+# reconnect.config(state=tk.DISABLED)
 
 tk.Label(text="Sampling Controls", relief=tk.GROOVE).grid(row=1, columnspan=2, column=2, sticky="NSEW")
 
@@ -232,6 +240,7 @@ def update_trigger_mode(a, b, c):
 
 trigger_mode_entry.trace_variable('w', update_trigger_mode)
 int_time_entry.trace_variable('w', update_integration_time)
-update_plot()
+if devices:
+    update_plot()
 
 root.mainloop()
