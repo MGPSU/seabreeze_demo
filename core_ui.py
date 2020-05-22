@@ -10,7 +10,6 @@ from testing_utils import generate_dummy_spectra
 import random
 import pandas as pd
 import numpy as np
-import laser_control
 
 root = tk.Tk()
 root.resizable(0, 0)
@@ -249,12 +248,6 @@ img_button.grid(row=11, column=2, columnspan=2, sticky="NSEW")
 
 csv_button = tk.Button(root, text='Export CSV', command=export_csv)
 csv_button.grid(row=12, column=2, columnspan=2, sticky="NSEW")
-
-sav_button = tk.Button(root, text='Save Settings', command=save_settings)
-sav_button.grid(row=13, column=2, columnspan=2, sticky="NSEW")
-
-load_button = tk.Button(root, text='Load Settings', command=load_settings)
-load_button.grid(row=14, column=2, columnspan=2, sticky="NSEW")
 
 # laser control UI
 tk.Button(root, text=" ", state=tk.DISABLED).grid(row=0, column=4, rowspan=18, sticky="NSEW")  # divider
